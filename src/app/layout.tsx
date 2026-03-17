@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Next.js Template",
-  description: "A minimal Next.js starter template",
+  title: "A4 Document Editor",
+  description: "Place images and PDFs on an A4 canvas with perspective warp, then export as PDF",
 };
 
 export default function RootLayout({

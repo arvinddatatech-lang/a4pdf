@@ -14,14 +14,16 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 - [x] ESLint configuration
 - [x] Memory bank documentation
 - [x] Recipe system for common features
+- [x] A4 Document Editor with ruler, canvas, image/PDF upload, perspective warp, and PDF export
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
-| `src/app/page.tsx` | Home page | ✅ Ready |
+| `src/app/page.tsx` | Home page → renders A4Editor | ✅ Ready |
 | `src/app/layout.tsx` | Root layout | ✅ Ready |
 | `src/app/globals.css` | Global styles | ✅ Ready |
+| `src/components/A4Editor.tsx` | Full A4 editor with ruler, warp, PDF export | ✅ Ready |
 | `.kilocode/` | AI context & recipes | ✅ Ready |
 
 ## Current Focus
@@ -85,3 +87,4 @@ export async function GET() {
 | Date | Changes |
 |------|---------|
 | Initial | Template created with base setup |
+| 2026-03-17 | Built A4 Document Editor: ruler (cm/mm/in), drag-drop image & PDF placement, perspective warp via 4-corner handles, resize handles, layer ordering, PDF download via jsPDF |
