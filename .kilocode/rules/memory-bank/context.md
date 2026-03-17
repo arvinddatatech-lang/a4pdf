@@ -24,6 +24,8 @@ The template is a clean Next.js 16 starter with TypeScript and Tailwind CSS 4. I
 | `src/app/layout.tsx` | Root layout | ✅ Ready |
 | `src/app/globals.css` | Global styles | ✅ Ready |
 | `src/components/A4Editor.tsx` | Full A4 editor with ruler, warp, PDF export | ✅ Ready |
+| `src/app/api/download-editor/route.ts` | Serves a4-editor.html as file download | ✅ Ready |
+| `a4-editor.html` | Standalone HTML/JS/CSS editor (no build needed) | ✅ Ready |
 | `.kilocode/` | AI context & recipes | ✅ Ready |
 
 ## Current Focus
@@ -88,3 +90,4 @@ export async function GET() {
 |------|---------|
 | Initial | Template created with base setup |
 | 2026-03-17 | Built A4 Document Editor: ruler (cm/mm/in), drag-drop image & PDF placement, perspective warp via 4-corner handles, resize handles, layer ordering, PDF download via jsPDF |
+| 2026-03-17 | Added standalone a4-editor.html + API route GET /api/download-editor + "Download Editor" toolbar button (indigo) to download the HTML file directly from the app |
