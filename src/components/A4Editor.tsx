@@ -776,7 +776,7 @@ export default function A4Editor() {
 
         <div className="flex-1" />
 
-        {/* Download */}
+        {/* Download PDF */}
         <button
           onClick={downloadPDF}
           className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition-colors shadow"
@@ -786,6 +786,18 @@ export default function A4Editor() {
           </svg>
           Download PDF
         </button>
+
+        {/* Download standalone HTML editor */}
+        <a
+          href="/api/download-editor"
+          download="a4-editor.html"
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded transition-colors shadow"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download Editor
+        </a>
       </div>
 
       {/* Hint bar */}
