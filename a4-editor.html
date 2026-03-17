@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A4 Document Editor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f3f4f6;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      flex-wrap: wrap;
+    }
+
+    #toolbar .brand {
+      font-weight: 600;
+      font-size: 13px;
+      color: #1f2937;
+      margin-right: 4px;
+    }
+
+    .sep {
+      width: 1px;
+      height: 20px;
+      background: #d1d5db;
+      flex-shrink: 0;
+    }
+
+    button, label.btn, select {
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+      white-space: nowrap;
+    }
+
+    button, label.btn {
+      padding: 6px 12px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      color: #374151;
+    }
+    button:hover:not(:disabled), label.btn:hover {
+      background: #f9fafb;
+    }
+    button:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    select {
+      padding: 6px 8px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      color: #374151;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: #fff;
+      border-color: #1d4ed8;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+
+    .btn-success {
+      background: #16a34a;
+      color: #fff;
+      border-color: #15803d;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-success:hover { background: #15803d; }
+
+    .btn-danger {
+      background: #fef2f2;
+      color: #dc2626;
+      border-color: #fecaca;
+    }
+    .btn-danger:hover { background: #fee2e2; }
+
+    #btn-warp.active {
+      background: #f59e0b;
+      color: #fff;
+      border-color: #d97706;
+    }
+
+    #toolbar .spacer { flex: 1; }
+
+    /* ── Hint bar ── */
+    #hintbar {
+      padding: 4px 16px;
+      background: #eff6ff;
+      border-bottom: 1px solid #bfdbfe;
+      font-size: 11px;
+      color: #1d4ed8;
+      display: flex;
+      gap: 12px;
+    }
+    #hintbar.warp-mode {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+      font-weight: 500;
+    }
+
+    /* ── Canvas scroll area ── */
+    #canvas-area {
+      flex: 1;
+      overflow: auto;
+      background: #9ca3af;
+      padding: 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    #canvas-wrapper {
+      transform-origin: top left;
+    }
+
+    #main-canvas {
+      display: block;
+      box-shadow: 0 4px 32px rgba(0,0,0,.18);
+      cursor: default;
+    }
+    #main-canvas.grabbing { cursor: grabbing; }
+
+    /* ── Item strip ── */
+    #item-strip {
+      display: none;
+      border-top: 1px solid #e5e7eb;
+      background: #fff;
+      padding: 8px 16px;
+      gap: 10px;
+      overflow-x: auto;
+    }
+    #item-strip.visible { display: flex; }
+
+    .item-thumb {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      font-size: 11px;
+      color: #6b7280;
+      cursor: pointer;
+      transition: background .12s, border-color .12s;
+    }
+    .item-thumb:hover { background: #f3f4f6; }
+    .item-thumb.selected {
+      border-color: #3b82f6;
+      background: #eff6ff;
+      color: #1e40af;
+    }
+    .item-thumb img {
+      width: 16px;
+      height: 16px;
+      object-fit: cover;
+      border-radius: 2px;
+    }
+    .item-thumb .label {
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      opacity: .6;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <span class="brand">A4 Document Editor</span>
+
+  <label class="btn btn-primary" id="upload-label">
+    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Add Image / PDF
+    <input type="file" id="file-input" accept="image/*,application/pdf" multiple style="display:none" />
+  </label>
+
+  <div class="sep"></div>
+
+  <button id="btn-warp" disabled>Warp Mode</button>
+  <button id="btn-reset-warp" disabled>Reset Warp</button>
+
+  <div class="sep"></div>
+
+  <button id="btn-forward" disabled title="Bring Forward">↑ Forward</button>
+  <button id="btn-backward" disabled title="Send Backward">↓ Backward</button>
+  <button id="btn-delete" class="btn-danger" disabled>Delete</button>
+
+  <div class="sep"></div>
+
+  <select id="ruler-unit">
+    <option value="cm">Ruler: cm</option>
+    <option value="mm">Ruler: mm</option>
+    <option value="in">Ruler: in</option>
+  </select>
+
+  <select id="zoom-select">
+    <option value="0.5">50%</option>
+    <option value="0.75">75%</option>
+    <option value="1" selected>100%</option>
+    <option value="1.25">125%</option>
+    <option value="1.5">150%</option>
+  </select>
+
+  <div class="spacer"></div>
+
+  <button id="btn-download" class="btn-success">
+    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+    </svg>
+    Download PDF
+  </button>
+</div>
+
+<!-- Hint bar -->
+<div id="hintbar">
+  <span id="hint-text">Click to select &bull; Drag to move &bull; Drag corner handles to resize</span>
+  <span id="hint-sub" style="opacity:.6">&bull; Enable Warp Mode to drag corners for perspective warp</span>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-area">
+  <div id="canvas-wrapper">
+    <canvas id="main-canvas"></canvas>
+  </div>
+</div>
+
+<!-- Item strip -->
+<div id="item-strip"></div>
+
+<!-- jsPDF via CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const A4_W = 794;
+const A4_H = 1123;
+const MM_TO_PX = 3.7795;
+const RULER_SIZE = 24;
+const CANVAS_W = A4_W + RULER_SIZE;
+const CANVAS_H = A4_H + RULER_SIZE;
+
+// ── State ─────────────────────────────────────────────────────────────────
+let items = [];        // PlacedItem[]
+let drag = null;       // DragState | null
+let warpMode = false;
+let zoom = 1;
+let rulerUnit = "cm";
+let animFrameId = null;
+const imageCache = new Map();
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const canvas   = document.getElementById("main-canvas");
+const ctx      = canvas.getContext("2d");
+const wrapper  = document.getElementById("canvas-wrapper");
+const hintbar  = document.getElementById("hintbar");
+const hintText = document.getElementById("hint-text");
+const hintSub  = document.getElementById("hint-sub");
+const strip    = document.getElementById("item-strip");
+
+canvas.width  = CANVAS_W;
+canvas.height = CANVAS_H;
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function genId() { return Math.random().toString(36).slice(2, 10); }
+
+function loadImage(src) {
+  return new Promise(resolve => {
+    if (imageCache.has(src)) { resolve(imageCache.get(src)); return; }
+    const img = new Image();
+    img.onload = () => { imageCache.set(src, img); resolve(img); };
+    img.src = src;
+  });
+}
+
+function fileToDataURL(file) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.readAsDataURL(file);
+  });
+}
+
+function getAbsoluteWarpPoints(item) {
+  const corners = [
+    { x: item.x,              y: item.y              },
+    { x: item.x + item.width, y: item.y              },
+    { x: item.x + item.width, y: item.y + item.height },
+    { x: item.x,              y: item.y + item.height },
+  ];
+  return corners.map((c, i) => ({
+    x: c.x + item.warpPoints[i].x,
+    y: c.y + item.warpPoints[i].y,
+  }));
+}
+
+function zeroWarp() {
+  return [{ x:0,y:0 },{ x:0,y:0 },{ x:0,y:0 },{ x:0,y:0 }];
+}
+
+// ── Warp drawing ──────────────────────────────────────────────────────────
+function drawWarpedImage(c, img, pts) {
+  const STEPS = 32;
+  const srcW = img.naturalWidth;
+  const srcH = img.naturalHeight;
+
+  function bilerp(u, v) {
+    const [tl, tr, br, bl] = pts;
+    return {
+      x: (1-u)*(1-v)*tl.x + u*(1-v)*tr.x + u*v*br.x + (1-u)*v*bl.x,
+      y: (1-u)*(1-v)*tl.y + u*(1-v)*tr.y + u*v*br.y + (1-u)*v*bl.y,
+    };
+  }
+
+  for (let row = 0; row < STEPS; row++) {
+    for (let col = 0; col < STEPS; col++) {
+      const u0 = col / STEPS, v0 = row / STEPS;
+      const u1 = (col+1)/STEPS, v1 = (row+1)/STEPS;
+
+      const p00 = bilerp(u0,v0), p10 = bilerp(u1,v0);
+      const p11 = bilerp(u1,v1), p01 = bilerp(u0,v1);
+
+      const sx = u0*srcW, sy = v0*srcH;
+      const sw = (u1-u0)*srcW, sh = (v1-v0)*srcH;
+
+      const dx1 = p10.x - p00.x, dy1 = p10.y - p00.y;
+      const dx2 = p01.x - p00.x, dy2 = p01.y - p00.y;
+
+      c.save();
+      c.beginPath();
+      c.moveTo(p00.x,p00.y); c.lineTo(p10.x,p10.y);
+      c.lineTo(p11.x,p11.y); c.lineTo(p01.x,p01.y);
+      c.closePath();
+      c.clip();
+      c.transform(
+        dx1/sw, dy1/sw,
+        dx2/sh, dy2/sh,
+        p00.x - dx1*(sx/sw) - dx2*(sy/sh),
+        p00.y - dy1*(sx/sw) - dy2*(sy/sh)
+      );
+      c.drawImage(img, sx, sy, sw, sh, sx, sy, sw, sh);
+      c.restore();
+    }
+  }
+}
+
+// ── Ruler ─────────────────────────────────────────────────────────────────
+function drawRuler(direction) {
+  const isH = direction === "horizontal";
+  const totalPx = isH ? A4_W : A4_H;
+
+  ctx.save();
+  ctx.fillStyle = "#f8fafc";
+  if (isH) {
+    ctx.fillRect(RULER_SIZE, 0, totalPx, RULER_SIZE);
+    ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 1;
+    ctx.strokeRect(RULER_SIZE, 0, totalPx, RULER_SIZE);
+  } else {
+    ctx.fillRect(0, RULER_SIZE, RULER_SIZE, totalPx);
+    ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 1;
+    ctx.strokeRect(0, RULER_SIZE, RULER_SIZE, totalPx);
+  }
+
+  ctx.fillStyle = "#64748b";
+  ctx.strokeStyle = "#94a3b8";
+  ctx.lineWidth = 0.5;
+  ctx.font = "9px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (let mm = 0; mm <= 210; mm++) {
+    const px = mm * MM_TO_PX;
+    if (px > totalPx) break;
+    const isMajor = mm % 10 === 0;
+    const isMid   = mm % 5  === 0;
+    const tickLen = isMajor ? 12 : isMid ? 8 : 4;
+
+    ctx.beginPath();
+    if (isH) {
+      ctx.moveTo(RULER_SIZE + px, RULER_SIZE - tickLen);
+      ctx.lineTo(RULER_SIZE + px, RULER_SIZE);
+    } else {
+      ctx.moveTo(RULER_SIZE - tickLen, RULER_SIZE + px);
+      ctx.lineTo(RULER_SIZE,           RULER_SIZE + px);
+    }
+    ctx.stroke();
+
+    if (rulerUnit === "mm" && isMid) {
+      const label = `${mm}`;
+      if (isH) {
+        ctx.fillText(label, RULER_SIZE + px, RULER_SIZE / 2);
+      } else {
+        ctx.save();
+        ctx.translate(RULER_SIZE/2, RULER_SIZE + px);
+        ctx.rotate(-Math.PI/2);
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
+    } else if (rulerUnit !== "mm" && isMajor) {
+      const label = rulerUnit === "cm" ? `${mm/10}` : `${(mm/25.4).toFixed(1)}`;
+      if (isH) {
+        ctx.fillText(label, RULER_SIZE + px, RULER_SIZE / 2);
+      } else {
+        ctx.save();
+        ctx.translate(RULER_SIZE/2, RULER_SIZE + px);
+        ctx.rotate(-Math.PI/2);
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// ── Main render ───────────────────────────────────────────────────────────
+async function render() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // A4 background
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "rgba(0,0,0,.3)";
+  ctx.shadowBlur = 12;
+  ctx.fillRect(RULER_SIZE, RULER_SIZE, A4_W, A4_H);
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+
+  // Page border
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(RULER_SIZE, RULER_SIZE, A4_W, A4_H);
+
+  // Items
+  for (const item of items) {
+    const img = await loadImage(item.src);
+    const pts = getAbsoluteWarpPoints(item).map(p => ({
+      x: p.x + RULER_SIZE,
+      y: p.y + RULER_SIZE,
+    }));
+
+    ctx.save();
+    drawWarpedImage(ctx, img, pts);
+
+    if (item.selected) {
+      // Dashed selection outline
+      ctx.strokeStyle = "#3b82f6";
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash([6/zoom, 3/zoom]);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(pts[1].x, pts[1].y);
+      ctx.lineTo(pts[2].x, pts[2].y);
+      ctx.lineTo(pts[3].x, pts[3].y);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (!warpMode) {
+        // Resize handles
+        const bx = item.x + RULER_SIZE, by = item.y + RULER_SIZE;
+        const bw = item.width,          bh = item.height;
+        const handles = [
+          [bx,         by        ],
+          [bx + bw/2,  by        ],
+          [bx + bw,    by        ],
+          [bx + bw,    by + bh/2 ],
+          [bx + bw,    by + bh   ],
+          [bx + bw/2,  by + bh   ],
+          [bx,         by + bh   ],
+          [bx,         by + bh/2 ],
+        ];
+        for (const [hx, hy] of handles) {
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = "#3b82f6";
+          ctx.lineWidth = 1.5 / zoom;
+          ctx.beginPath();
+          ctx.arc(hx, hy, 5/zoom, 0, Math.PI*2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      } else {
+        // Warp handles
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = "#f59e0b";
+          ctx.strokeStyle = "#b45309";
+          ctx.lineWidth = 1.5 / zoom;
+          ctx.beginPath();
+          ctx.arc(pts[i].x, pts[i].y, 7/zoom, 0, Math.PI*2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  drawRuler("horizontal");
+  drawRuler("vertical");
+
+  // Corner square
+  ctx.fillStyle = "#f1f5f9";
+  ctx.fillRect(0, 0, RULER_SIZE, RULER_SIZE);
+  ctx.strokeStyle = "#cbd5e1";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, 0, RULER_SIZE, RULER_SIZE);
+}
+
+function startLoop() {
+  if (animFrameId) return;
+  const loop = () => {
+    render();
+    animFrameId = requestAnimationFrame(loop);
+  };
+  animFrameId = requestAnimationFrame(loop);
+}
+
+startLoop();
+
+// ── Coordinate helpers ────────────────────────────────────────────────────
+function screenToCanvas(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) / zoom,
+    y: (e.clientY - rect.top)  / zoom,
+  };
+}
+
+function canvasToA4(cx, cy) {
+  return { x: cx - RULER_SIZE, y: cy - RULER_SIZE };
+}
+
+// ── Hit test ──────────────────────────────────────────────────────────────
+function hitTest(cx, cy) {
+  const a4x = cx - RULER_SIZE;
+  const a4y = cy - RULER_SIZE;
+  const R = 9 / zoom;
+
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+
+    if (item.selected && warpMode) {
+      const pts = getAbsoluteWarpPoints(item);
+      for (let ci = 0; ci < 4; ci++) {
+        if (Math.hypot(pts[ci].x - a4x, pts[ci].y - a4y) <= R) {
+          return { type:"warp", itemId: item.id, cornerIndex: ci };
+        }
+      }
+    }
+
+    if (item.selected && !warpMode) {
+      const bx = item.x, by = item.y, bw = item.width, bh = item.height;
+      const handles = [
+        ["tl", bx,       by      ], ["tc", bx+bw/2, by      ], ["tr", bx+bw, by      ],
+        ["mr", bx+bw,    by+bh/2 ],
+        ["br", bx+bw,    by+bh   ], ["bc", bx+bw/2, by+bh   ], ["bl", bx,    by+bh   ],
+        ["ml", bx,       by+bh/2 ],
+      ];
+      for (const [handle, hx, hy] of handles) {
+        if (Math.hypot(hx - a4x, hy - a4y) <= R) {
+          return { type:"resize", itemId: item.id, handle };
+        }
+      }
+    }
+
+    if (a4x >= item.x && a4x <= item.x + item.width &&
+        a4y >= item.y && a4y <= item.y + item.height) {
+      return { type:"move", itemId: item.id };
+    }
+  }
+  return null;
+}
+
+// ── Mouse events ──────────────────────────────────────────────────────────
+canvas.addEventListener("mousedown", e => {
+  const { x: cx, y: cy } = screenToCanvas(e);
+  const hit = hitTest(cx, cy);
+  const a4  = canvasToA4(cx, cy);
+
+  if (hit) {
+    items.forEach(item => item.selected = item.id === hit.itemId);
+
+    if (hit.type === "warp") {
+      const item = items.find(i => i.id === hit.itemId);
+      drag = {
+        type: "warp",
+        itemId: hit.itemId,
+        cornerIndex: hit.cornerIndex,
+        startX: a4.x, startY: a4.y,
+        origPoints: JSON.parse(JSON.stringify(item.warpPoints)),
+      };
+    } else if (hit.type === "resize") {
+      const item = items.find(i => i.id === hit.itemId);
+      drag = {
+        type: "resize",
+        itemId: hit.itemId,
+        handle: hit.handle,
+        startX: a4.x, startY: a4.y,
+        origX: item.x, origY: item.y,
+        origW: item.width, origH: item.height,
+      };
+    } else {
+      const item = items.find(i => i.id === hit.itemId);
+      drag = {
+        type: "move",
+        itemId: hit.itemId,
+        startX: a4.x, startY: a4.y,
+        origX: item.x, origY: item.y,
+      };
+    }
+  } else {
+    items.forEach(item => item.selected = false);
+  }
+
+  updateUI();
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (!drag) return;
+  const { x: cx, y: cy } = screenToCanvas(e);
+  const a4 = canvasToA4(cx, cy);
+  const dx = a4.x - drag.startX;
+  const dy = a4.y - drag.startY;
+  const item = items.find(i => i.id === drag.itemId);
+  if (!item) return;
+
+  if (drag.type === "move") {
+    item.x = Math.max(0, Math.min(A4_W - item.width,  drag.origX + dx));
+    item.y = Math.max(0, Math.min(A4_H - item.height, drag.origY + dy));
+  } else if (drag.type === "warp") {
+    item.warpPoints[drag.cornerIndex] = {
+      x: drag.origPoints[drag.cornerIndex].x + dx,
+      y: drag.origPoints[drag.cornerIndex].y + dy,
+    };
+  } else if (drag.type === "resize") {
+    let { x, y, width, height } = { x: drag.origX, y: drag.origY, width: drag.origW, height: drag.origH };
+    const h = drag.handle;
+    if (h.includes("r")) width  = Math.max(20, drag.origW + dx);
+    if (h.includes("l")) { x = drag.origX + dx; width  = Math.max(20, drag.origW - dx); }
+    if (h.includes("b")) height = Math.max(20, drag.origH + dy);
+    if (h.includes("t")) { y = drag.origY + dy; height = Math.max(20, drag.origH - dy); }
+    item.x = x; item.y = y; item.width = width; item.height = height;
+    item.warpPoints = zeroWarp();
+  }
+});
+
+canvas.addEventListener("mouseup",    () => { drag = null; canvas.classList.remove("grabbing"); });
+canvas.addEventListener("mouseleave", () => { drag = null; });
+canvas.addEventListener("mousedown",  () => { if (drag === null) return; canvas.classList.add("grabbing"); });
+
+// Cursor while dragging
+document.addEventListener("mouseup", () => canvas.classList.remove("grabbing"));
+
+// ── File upload ───────────────────────────────────────────────────────────
+document.getElementById("file-input").addEventListener("change", async e => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+
+  for (const file of files) {
+    if (file.type.startsWith("image/")) {
+      const src = await fileToDataURL(file);
+      const img = await loadImage(src);
+      const aspect = img.naturalWidth / img.naturalHeight;
+      const maxW = Math.min(400, A4_W - 40);
+      const w = maxW, h = w / aspect;
+      items.forEach(i => i.selected = false);
+      items.push({
+        id: genId(), type:"image", src,
+        x: 20, y: 20, width: w, height: h,
+        warpPoints: zeroWarp(), rotation: 0,
+        selected: true, label: file.name,
+      });
+    } else if (file.type === "application/pdf") {
+      await handlePdfUpload(file);
+    }
+  }
+  e.target.value = "";
+  updateUI();
+});
+
+async function handlePdfUpload(file) {
+  const ab = await file.arrayBuffer();
+  const uint8 = new Uint8Array(ab);
+
+  const pdfjsLib = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs");
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+
+  const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+  const numPages = Math.min(pdf.numPages, 5);
+
+  for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const off = document.createElement("canvas");
+    off.width = viewport.width; off.height = viewport.height;
+    const offCtx = off.getContext("2d");
+    await page.render({ canvasContext: offCtx, viewport }).promise;
+    const src = off.toDataURL("image/png");
+
+    const aspect = viewport.width / viewport.height;
+    const maxW = Math.min(350, A4_W - 40);
+    const w = maxW, h = w / aspect;
+    const ox = 20 + (pageNum - 1) * 30;
+    const oy = 20 + (pageNum - 1) * 30;
+
+    items.forEach(i => i.selected = false);
+    items.push({
+      id: genId(), type: "pdf-page", src,
+      x: Math.min(ox, A4_W - w - 10),
+      y: Math.min(oy, A4_H - h - 10),
+      width: w, height: h,
+      warpPoints: zeroWarp(), rotation: 0,
+      selected: pageNum === 1,
+      label: `${file.name} p.${pageNum}`,
+    });
+  }
+}
+
+// ── Toolbar actions ───────────────────────────────────────────────────────
+document.getElementById("btn-warp").addEventListener("click", () => {
+  if (!items.some(i => i.selected)) return;
+  warpMode = !warpMode;
+  updateUI();
+});
+
+document.getElementById("btn-reset-warp").addEventListener("click", () => {
+  items.filter(i => i.selected).forEach(i => i.warpPoints = zeroWarp());
+});
+
+document.getElementById("btn-forward").addEventListener("click", () => {
+  const idx = items.findIndex(i => i.selected);
+  if (idx < 0 || idx === items.length - 1) return;
+  [items[idx], items[idx+1]] = [items[idx+1], items[idx]];
+  updateUI();
+});
+
+document.getElementById("btn-backward").addEventListener("click", () => {
+  const idx = items.findIndex(i => i.selected);
+  if (idx <= 0) return;
+  [items[idx], items[idx-1]] = [items[idx-1], items[idx]];
+  updateUI();
+});
+
+document.getElementById("btn-delete").addEventListener("click", () => {
+  items = items.filter(i => !i.selected);
+  updateUI();
+});
+
+document.getElementById("ruler-unit").addEventListener("change", e => {
+  rulerUnit = e.target.value;
+});
+
+document.getElementById("zoom-select").addEventListener("change", e => {
+  zoom = parseFloat(e.target.value);
+  wrapper.style.transform = `scale(${zoom})`;
+  // Adjust canvas-area size for zoom
+  const area = document.getElementById("canvas-area");
+  area.style.minHeight = (CANVAS_H * zoom + 48) + "px";
+});
+
+// ── Download PDF ──────────────────────────────────────────────────────────
+document.getElementById("btn-download").addEventListener("click", async () => {
+  const scale = 2;
+  const off = document.createElement("canvas");
+  off.width  = A4_W * scale;
+  off.height = A4_H * scale;
+  const offCtx = off.getContext("2d");
+  offCtx.scale(scale, scale);
+
+  offCtx.fillStyle = "#ffffff";
+  offCtx.fillRect(0, 0, A4_W, A4_H);
+
+  for (const item of items) {
+    const img = await loadImage(item.src);
+    const pts = getAbsoluteWarpPoints(item);
+    drawWarpedImage(offCtx, img, pts);
+  }
+
+  const imgData = off.toDataURL("image/png");
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  pdf.addImage(imgData, "PNG", 0, 0, 210, 297);
+  pdf.save("a4-document.pdf");
+});
+
+// ── UI sync ───────────────────────────────────────────────────────────────
+function updateUI() {
+  const hasSelected = items.some(i => i.selected);
+
+  document.getElementById("btn-warp").disabled        = !hasSelected;
+  document.getElementById("btn-reset-warp").disabled  = !hasSelected;
+  document.getElementById("btn-forward").disabled     = !hasSelected;
+  document.getElementById("btn-backward").disabled    = !hasSelected;
+  document.getElementById("btn-delete").disabled      = !hasSelected;
+
+  const warpBtn = document.getElementById("btn-warp");
+  warpBtn.textContent = warpMode ? "Warp ON" : "Warp Mode";
+  warpBtn.classList.toggle("active", warpMode);
+
+  if (warpMode) {
+    hintbar.className = "warp-mode";
+    hintText.textContent = "Warp Mode: Drag the 4 orange corner handles to perspective-warp the selected item";
+    hintSub.style.display = "none";
+  } else {
+    hintbar.className = "";
+    hintText.textContent = "Click to select \u2022 Drag to move \u2022 Drag corner handles to resize";
+    hintSub.style.display = "";
+    hintSub.textContent = "\u2022 Enable Warp Mode to drag corners for perspective warp";
+  }
+
+  // Item strip
+  if (items.length > 0) {
+    strip.className = "visible";
+    strip.innerHTML = "";
+    items.forEach((item, idx) => {
+      const btn = document.createElement("button");
+      btn.className = "item-thumb" + (item.selected ? " selected" : "");
+      btn.innerHTML = `
+        <img src="${item.src}" alt="" />
+        <span>${idx+1}. ${item.type === "pdf-page" ? "PDF" : "Img"}</span>
+        <span class="label">${item.label || ""}</span>`;
+      btn.addEventListener("click", () => {
+        items.forEach(i => i.selected = i.id === item.id);
+        updateUI();
+      });
+      strip.appendChild(btn);
+    });
+  } else {
+    strip.className = "";
+  }
+}
+</script>
+</body>
+</html>
